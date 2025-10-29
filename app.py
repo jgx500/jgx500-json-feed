@@ -1,42 +1,38 @@
 from flask import Flask, request, jsonify
-import os, time
 
 app = Flask(__name__)
 
-# Token čítaný výhradne z prostredia Render – bez fallback hodnoty
-AUTH_TOKEN = os.environ["AUTH_TOKEN"]
-print(f"[DEBUG] Loaded AUTH_TOKEN from env: {AUTH_TOKEN}")
+# ==========================
+# KONFIGURÁCIA
+# ==========================
+EXPECTED_TOKEN = "jgx500-20205-reset"  # rovnaký ako v EA
+# ==========================
 
-@app.route("/healthz", methods=["GET"])
-def healthz():
-    return jsonify({"ok": True, "time": time.time()})
+
+@app.route("/", methods=["GET"])
+def health_check():
+    """Základný test – otvoríš v prehliadači, musí napísať 'OK'."""
+    return "OK", 200
+
 
 @app.route("/ingest", methods=["POST"])
-def ingest():
-    auth_header = request.headers.get("Authorization", "")
-    token = ""
+def ingest_data():
+    """Prijíma dáta z MT5 EA"""
+    auth_header = request.headers.get("X-Auth-Token", "")
 
-    if not auth_header:
-        auth_header = request.headers.get("X-Auth-Token", "")
+    if auth_header != EXPECTED_TOKEN:
+        return jsonify({"error": "Unauthorized"}), 401
 
-    if auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-    elif auth_header:
-        token = auth_header
-    else:
-        token = request.headers.get("X-Auth-Token", "")
-
-    if token.strip() != AUTH_TOKEN.strip():
-        return jsonify({"error": "unauthorized", "received": token}), 401
-
+    # získaj JSON payload
     data = request.get_json(silent=True)
     if not data:
-        return jsonify({"error": "no data"}), 400
+        return jsonify({"error": "Invalid JSON"}), 400
 
-    print(f"[FEED] {data}")
-    return jsonify({"ok": True, "received": data}), 200
+    print("✅ Received:", data)  # zobrazí sa v Render logu
+
+    # tu môžeš uložiť dáta, poslať ďalej, atď.
+    return jsonify({"status": "ok"}), 200
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=10000)
