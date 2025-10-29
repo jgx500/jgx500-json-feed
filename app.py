@@ -14,7 +14,10 @@ def healthz():
 @app.route("/ingest", methods=["POST"])
 def ingest():
     auth_header = request.headers.get("Authorization", "")
-    token = ""
+    token = "" 
+    if not auth_header:
+    auth_header = request.headers.get("X-Auth-Token", "")
+
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]
     elif auth_header:
