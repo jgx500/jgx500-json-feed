@@ -1,51 +1,43 @@
 from flask import Flask, request, jsonify
-import os, time
+import os
+import time
 
 app = Flask(__name__)
 
+# Token – ak nie je v prostredí, nastav default
 AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "jgx500-secure-token")
 
-# povolené symboly
-ALLOWED_SYMBOLS = {"SP500", "SP500ft", "BTCUSD", "XAUUSD+"}
-
-FEED_DATA = {}
-
-@app.get("/healthz")
+# Zdravotná kontrola
+@app.route("/healthz", methods=["GET"])
 def healthz():
-    return jsonify(ok=True, ts=int(time.time()))
+    return jsonify({"ok": True, "time": time.time()})
 
-@app.post("/ingest")
+# Príjem dát z MT5
+@app.route("/ingest", methods=["POST"])
 def ingest():
     auth_header = request.headers.get("Authorization", "")
-if not auth_header.startswith("Bearer ") or auth_header.split(" ")[1] != AUTH_TOKEN:
-    return jsonify({"error": "unauthorized"}), 401
+    token = ""
 
+    # Povolené formáty hlavičiek
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    elif auth_header:
+        token = auth_header
+    else:
+        token = request.headers.get("X-Auth-Token", "")
 
-    data = request.get_json(silent=True) or {}
-    symbol = data.get("symbol")
-    bid = data.get("bid")
-    ask = data.get("ask")
+    # Overenie tokenu
+    if token != AUTH_TOKEN:
+        return jsonify({"error": "unauthorized"}), 401
 
-    if symbol is None or bid is None or ask is None:
-        return jsonify(error="invalid format: need {symbol,bid,ask}"), 400
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "no data"}), 400
 
-    # kontrola symbolov
-    if symbol not in ALLOWED_SYMBOLS:
-        pass  # ak chceš prijať všetko, môžeš vymazať tento riadok
+    print(f"[FEED] {data}")
+    return jsonify({"ok": True, "received": data}), 200
 
-    FEED_DATA.update({
-        "symbol": symbol,
-        "bid": bid,
-        "ask": ask,
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
-    })
-    return jsonify(ok=True)
-
-@app.get("/feed.json")
-def feed():
-    if not FEED_DATA:
-        return jsonify(error="no data yet"), 404
-    return jsonify(FEED_DATA)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
