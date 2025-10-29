@@ -16,8 +16,10 @@ def healthz():
 
 @app.post("/ingest")
 def ingest():
-    if request.headers.get("X-Auth-Token") != AUTH_TOKEN:
-        return jsonify(error="unauthorized"), 401
+    auth_header = request.headers.get("Authorization", "")
+if not auth_header.startswith("Bearer ") or auth_header.split(" ")[1] != AUTH_TOKEN:
+    return jsonify({"error": "unauthorized"}), 401
+
 
     data = request.get_json(silent=True) or {}
     symbol = data.get("symbol")
