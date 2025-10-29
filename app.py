@@ -5,6 +5,7 @@ app = Flask(__name__)
 
 # Token čítaný výhradne z prostredia Render – bez fallback hodnoty
 AUTH_TOKEN = os.environ["AUTH_TOKEN"]
+print(f"[DEBUG] Loaded AUTH_TOKEN from env: {AUTH_TOKEN}")
 
 @app.route("/healthz", methods=["GET"])
 def healthz():
