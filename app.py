@@ -14,9 +14,10 @@ def healthz():
 @app.route("/ingest", methods=["POST"])
 def ingest():
     auth_header = request.headers.get("Authorization", "")
-    token = "" 
+    token = ""
+
     if not auth_header:
-    auth_header = request.headers.get("X-Auth-Token", "")
+        auth_header = request.headers.get("X-Auth-Token", "")
 
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]
@@ -34,6 +35,7 @@ def ingest():
 
     print(f"[FEED] {data}")
     return jsonify({"ok": True, "received": data}), 200
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
