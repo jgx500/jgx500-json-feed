@@ -1,24 +1,19 @@
 from flask import Flask, request, jsonify
-import os
-import time
+import os, time
 
 app = Flask(__name__)
 
-# Token – ak nie je v prostredí, nastav default
-AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "jgx500-secure-token")
+# Token čítaný výhradne z prostredia Render – bez fallback hodnoty
+AUTH_TOKEN = os.environ["AUTH_TOKEN"]
 
-# Zdravotná kontrola
 @app.route("/healthz", methods=["GET"])
 def healthz():
     return jsonify({"ok": True, "time": time.time()})
 
-# Príjem dát z MT5
 @app.route("/ingest", methods=["POST"])
 def ingest():
     auth_header = request.headers.get("Authorization", "")
     token = ""
-
-    # Povolené formáty hlavičiek
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]
     elif auth_header:
@@ -26,9 +21,8 @@ def ingest():
     else:
         token = request.headers.get("X-Auth-Token", "")
 
-    # Overenie tokenu
-    if token != AUTH_TOKEN:
-        return jsonify({"error": "unauthorized"}), 401
+    if token.strip() != AUTH_TOKEN.strip():
+        return jsonify({"error": "unauthorized", "received": token}), 401
 
     data = request.get_json(silent=True)
     if not data:
@@ -36,7 +30,6 @@ def ingest():
 
     print(f"[FEED] {data}")
     return jsonify({"ok": True, "received": data}), 200
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
