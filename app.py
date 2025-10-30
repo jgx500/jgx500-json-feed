@@ -1,50 +1,51 @@
 from flask import Flask, request, jsonify
+from datetime import datetime
 
 app = Flask(__name__)
 
-# ==========================
-# KONFIGURÁCIA
-# ==========================
-EXPECTED_TOKEN = "jgx500-20205-reset"  # rovnaký ako v EA
-# ==========================
+# --- tvoj tajný token z EA (musí sa zhodovať s tým v MT5) ---
+VALID_TOKEN = "jgx500-20205-reset"
 
 @app.route("/", methods=["GET"])
-def health_check():
-    """Základný test – otvoríš v prehliadači, musí napísať 'OK'."""
-    return "OK", 200
+def home():
+    return jsonify({"message": "JGX500 JSON feed running"}), 200
 
 
 @app.route("/ingest", methods=["POST"])
-def ingest_data():
-    """Prijíma dáta z MT5 EA"""
-
-    # 🔐 Over token
-    auth_header = request.headers.get("X-Auth-Token", "")
-    if auth_header != EXPECTED_TOKEN:
+def ingest():
+    # --- 1️⃣ kontrola tokenu ---
+    token = request.headers.get("X-Auth-Token")
+    if token != VALID_TOKEN:
         return jsonify({"error": "Unauthorized"}), 401
 
-    # 🧾 Získaj telo požiadavky ako text a skús dekódovať ručne
+    # --- 2️⃣ kontrola typu obsahu ---
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+
+    # --- 3️⃣ dekódovanie JSON ---
     try:
-        data = request.get_json(force=True)  # 👈 force obíde problém s Content-Type
+        data = request.get_json(force=True)
     except Exception as e:
-        print("⚠️ JSON decode error:", e)
-        return jsonify({"error": "Invalid JSON format"}), 400
+        return jsonify({"error": f"JSON decode error: {str(e)}"}), 400
 
-    if not isinstance(data, dict):
-        return jsonify({"error": "Malformed payload"}), 400
-
-    # 🔎 Skontroluj potrebné polia
+    # --- 4️⃣ validácia kľúčov ---
     required = ["symbol", "bid", "ask", "time"]
-    missing = [k for k in required if k not in data]
-    if missing:
-        return jsonify({"error": f"Missing fields: {missing}"}), 400
+    if not all(k in data for k in required):
+        return jsonify({"error": "Missing fields"}), 400
 
-    # ✅ Vypíš prijaté dáta do logu (Render logy)
-    print(f"✅ Received from EA: {data}")
+    # --- 5️⃣ validácia a konverzia času ---
+    try:
+        ts = datetime.fromisoformat(data["time"])
+    except Exception as e:
+        return jsonify({"error": f"Invalid time format: {str(e)}"}), 400
 
-    # môžeš tu pridať ďalšie spracovanie, uloženie, atď.
-    return jsonify({"status": "ok", "received": data}), 200
+    # --- 6️⃣ logovanie prichádzajúcich dát ---
+    print(f"[{datetime.now()}] {data['symbol']} @ {ts}: {data['bid']} / {data['ask']}")
+
+    # --- 7️⃣ odpoveď ---
+    return jsonify({"status": "ok"}), 200
 
 
+# --- Flask spustenie ---
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
